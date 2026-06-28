@@ -8,6 +8,8 @@ result with a plain-English summary. See the Notion plan: "AI vs. Rules".
 SIGNAL_BASE = {
     "NEW_REGION": 20,
     "API_RATE_ANOMALY": 30,
+    "TI_HOSTING": 15,      # source IP is datacenter/hosting (contextual)
+    "TI_ABUSE": 40,        # source IP flagged by threat intel
     "PRIV_ESC_CHAIN": 60,
     "DATA_EXFIL": 70,
 }

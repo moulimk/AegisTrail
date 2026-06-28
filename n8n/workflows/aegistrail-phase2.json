@@ -1,0 +1,132 @@
+{
+  "name": "AegisTrail - Phase 2 (score + AI triage + route)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aegistrail",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "9a000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "9a000000-0000-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://detector:8000/ingest",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "9a000000-0000-4000-8000-000000000002",
+      "name": "Detector Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://detector:8000/score",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $json.normalized.event_id }) }}",
+        "options": {}
+      },
+      "id": "9a000000-0000-4000-8000-000000000003",
+      "name": "Detector Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "risk-threshold",
+              "leftValue": "={{ $json.risk_score }}",
+              "rightValue": 50,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9a000000-0000-4000-8000-000000000004",
+      "name": "Risk Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $('Detector Score').first().json; const sev = r.risk_score >= 70 ? ':red_circle:' : (r.risk_score >= 40 ? ':large_orange_circle:' : ':large_yellow_circle:'); const sig = (r.signals || []).map(s => `- *${s.type}*: ${s.detail}`).join('\\n'); const geo = r.geo ? `${r.geo.city || '?'}, ${r.geo.country || '?'} (${r.geo.isp || '?'})` : 'unknown'; const ti = r.threat_intel ? `AbuseIPDB ${r.threat_intel.abuseConfidenceScore}/100, ${r.threat_intel.usageType || '?'}` : 'n/a'; const text = `${sev} *AegisTrail: ${r.incident_type}* (risk *${r.risk_score}/100*, conf ${r.confidence})\\n*Identity:* ${r.identity}\\n*Location:* ${geo}\\n*Threat intel:* ${ti}\\n*Signals:*\\n${sig}\\n*AI triage:* ${r.summary || '(rules-only)'}\\n*Recommended action:* ${r.recommended_action || 'n/a'}\\n*Incident:* ${r.incident_id}`; return [{ json: { slack_text: text } }];"
+      },
+      "id": "9a000000-0000-4000-8000-000000000005",
+      "name": "Build Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_INCOMING_WEBHOOK_URL",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.slack_text }) }}",
+        "options": {}
+      },
+      "id": "9a000000-0000-4000-8000-000000000006",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {},
+      "id": "9a000000-0000-4000-8000-000000000007",
+      "name": "Auto-Close (low risk)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1080, 420]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Detector Ingest", "type": "main", "index": 0 }]]
+    },
+    "Detector Ingest": {
+      "main": [[{ "node": "Detector Score", "type": "main", "index": 0 }]]
+    },
+    "Detector Score": {
+      "main": [[{ "node": "Risk Gate", "type": "main", "index": 0 }]]
+    },
+    "Risk Gate": {
+      "main": [
+        [{ "node": "Build Alert", "type": "main", "index": 0 }],
+        [{ "node": "Auto-Close (low risk)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Alert": {
+      "main": [[{ "node": "Slack Alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "meta": {}
+}

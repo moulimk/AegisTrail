@@ -3,22 +3,21 @@
   GET  /health         — liveness + DB check
   POST /ingest         — normalize a CloudTrail record and store it (idempotent)
   POST /baseline/seed  — seed/overwrite an identity baseline (avoid cold-start)
-  POST /score          — enrich + run rules + risk-score a stored event; raise incident
+  POST /score          — enrich (GeoIP + AbuseIPDB) + rules + risk score + LLM triage
   POST /contain        — SAFE_MODE action plan (protected-identity guarded)
-
-Phase 2b will add an LLM triage summary on top of the deterministic score.
 """
 from fastapi import FastAPI, HTTPException
 from psycopg.types.json import Json
 
+from . import abuseipdb
 from . import baseline as baseline_mod
-from . import detect, geoip, scoring
+from . import detect, geoip, scoring, triage
 from .contain import contain
 from .db import get_conn
 from .models import ContainRequest, ContainResult, ScoreRequest, SeedRequest
 from .normalize import normalize_cloudtrail
 
-app = FastAPI(title="AegisTrail Detector", version="0.2.0")
+app = FastAPI(title="AegisTrail Detector", version="0.3.0")
 
 
 @app.get("/health")
@@ -26,7 +25,7 @@ def health():
     try:
         with get_conn() as conn:
             conn.execute("SELECT 1")
-        return {"status": "ok", "db": "up"}
+        return {"status": "ok", "db": "up", "triage": triage.available()}
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"db down: {exc}")
 
@@ -82,7 +81,7 @@ def seed_baseline(req: SeedRequest):
 
 @app.post("/score")
 def score_event(req: ScoreRequest):
-    """Enrich a stored event, run detection rules, score it, raise an incident."""
+    """Enrich a stored event, run rules, score it, AI-triage it, raise an incident."""
     with get_conn() as conn:
         ev = conn.execute(
             "SELECT event_id, identity, action, service, source_ip, region FROM events WHERE event_id = %s",
@@ -91,21 +90,38 @@ def score_event(req: ScoreRequest):
         if ev is None:
             raise HTTPException(status_code=404, detail="event not found")
 
+        # Enrichment
         geo = geoip.lookup(ev["source_ip"])
+        ti = abuseipdb.lookup(ev["source_ip"])
+
+        # Deterministic detection + scoring
         base = baseline_mod.get_baseline(conn, ev["identity"])
-        signals = detect.run_rules(ev, geo, base)
+        signals = detect.run_rules(ev, geo, ti, base)
         risk = scoring.score([s["type"] for s in signals])
+        itype = detect.incident_type(signals) if signals else None
+        conf = detect.confidence(signals) if signals else 0.0
+
+        # AI triage annotates the rules result (rules-only fallback if disabled/failed)
+        triage_result = None
+        if signals:
+            triage_result = triage.triage({
+                "identity": ev["identity"], "action": ev["action"], "service": ev["service"],
+                "source_ip": ev["source_ip"], "aws_region": ev["region"],
+                "geo": geo, "threat_intel": ti, "signals": signals,
+                "risk_score": risk, "incident_type": itype,
+            })
+        summary = triage_result.get("summary") if triage_result else None
+        recommended_action = triage_result.get("recommended_action") if triage_result else None
 
         incident_id = None
-        if signals:  # any positive signal raises an incident
+        if signals:
             row = conn.execute(
                 """
-                INSERT INTO incidents (identity, incident_type, risk_score, confidence, status, signals)
-                VALUES (%s, %s, %s, %s, 'OPEN', %s)
+                INSERT INTO incidents (identity, incident_type, risk_score, confidence, status, summary, signals)
+                VALUES (%s, %s, %s, %s, 'OPEN', %s, %s)
                 RETURNING incident_id
                 """,
-                (ev["identity"], detect.incident_type(signals), risk,
-                 detect.confidence(signals), Json(signals)),
+                (ev["identity"], itype, risk, conf, summary, Json(signals)),
             ).fetchone()
             incident_id = str(row["incident_id"])
             conn.execute(
@@ -116,10 +132,8 @@ def score_event(req: ScoreRequest):
         # Learn: fold this event into the baseline after scoring it.
         baseline_mod.update_baseline(
             conn, ev["identity"],
-            region=ev["region"],
-            country=(geo or {}).get("country"),
-            service=ev["service"],
-            ip=ev["source_ip"],
+            region=ev["region"], country=(geo or {}).get("country"),
+            service=ev["service"], ip=ev["source_ip"],
         )
         conn.commit()
 
@@ -127,11 +141,14 @@ def score_event(req: ScoreRequest):
         "event_id": ev["event_id"],
         "identity": ev["identity"],
         "risk_score": risk,
-        "incident_type": detect.incident_type(signals) if signals else None,
-        "confidence": detect.confidence(signals) if signals else 0.0,
+        "incident_type": itype,
+        "confidence": conf,
         "signals": signals,
         "geo": {"country": (geo or {}).get("country"), "city": (geo or {}).get("city"),
                 "isp": (geo or {}).get("isp")} if geo else None,
+        "threat_intel": ti,
+        "summary": summary,
+        "recommended_action": recommended_action,
         "incident_id": incident_id,
     }
 

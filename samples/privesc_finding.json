@@ -1,0 +1,25 @@
+{
+  "eventVersion": "1.08",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLE0DEVBOT",
+    "arn": "arn:aws:iam::123456789012:user/dev-bot",
+    "accountId": "123456789012",
+    "accessKeyId": "AKIAEXAMPLE7LEAKED",
+    "userName": "dev-bot"
+  },
+  "eventTime": "2026-06-28T03:15:42Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "AttachUserPolicy",
+  "awsRegion": "us-east-1",
+  "sourceIPAddress": "45.155.205.233",
+  "userAgent": "aws-cli/2.15.0 Python/3.11 Linux/6.5",
+  "requestParameters": {
+    "userName": "dev-bot",
+    "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+  },
+  "eventID": "b1a2c3d4-0002-4f00-9abc-EXAMPLE00002",
+  "eventType": "AwsApiCall",
+  "recipientAccountId": "123456789012",
+  "_aegis_note": "Scenario #2 sample: dev-bot attaches AdministratorAccess to itself from the same RU IP. NEW_REGION + PRIV_ESC_CHAIN should correlate to CREDENTIAL_COMPROMISE (risk 80)."
+}

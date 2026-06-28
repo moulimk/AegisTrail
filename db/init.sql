@@ -24,7 +24,8 @@ CREATE INDEX IF NOT EXISTS idx_events_service  ON events (service);
 -- Per-identity behavioral baseline (rolling). Aggregates only, not full timeseries.
 CREATE TABLE IF NOT EXISTS identity_baseline (
     identity           TEXT PRIMARY KEY,
-    known_regions      JSONB  NOT NULL DEFAULT '[]'::jsonb,
+    known_regions      JSONB  NOT NULL DEFAULT '[]'::jsonb,   -- AWS regions seen
+    known_countries    JSONB  NOT NULL DEFAULT '[]'::jsonb,   -- source-IP geo countries seen
     known_services     JSONB  NOT NULL DEFAULT '[]'::jsonb,
     last_seen_ips      JSONB  NOT NULL DEFAULT '[]'::jsonb,   -- bounded set
     api_rate_mean      DOUBLE PRECISION NOT NULL DEFAULT 0,

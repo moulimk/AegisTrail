@@ -17,6 +17,19 @@ class NormalizedEvent(BaseModel):
     raw_event: dict[str, Any]
 
 
+class ScoreRequest(BaseModel):
+    event_id: str
+
+
+class SeedRequest(BaseModel):
+    identity: str
+    known_regions: list[str] = []
+    known_countries: list[str] = []
+    known_services: list[str] = []
+    last_seen_ips: list[str] = []
+    event_count: int = 0
+
+
 class ContainRequest(BaseModel):
     identity: str
     identity_type: Literal["iam_user", "role_session", "root"] = "iam_user"

@@ -1,0 +1,32 @@
+# Secrets — never commit
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Local data / docker volumes
+pgdata/
+n8n_data/
+
+# n8n workflow exports may embed credentials — scrub before committing.
+# Commit sanitized exports as *.json; keep raw editor exports as *.local.json (ignored).
+n8n/workflows/*.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Claude Code local settings (per-machine; keep out of VCS)
+.claude/settings.local.json
+
+# Logs
+*.log

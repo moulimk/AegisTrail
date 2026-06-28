@@ -1,0 +1,23 @@
+{
+  "eventVersion": "1.08",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLE0DEVBOT",
+    "arn": "arn:aws:iam::123456789012:user/dev-bot",
+    "accountId": "123456789012",
+    "accessKeyId": "AKIAEXAMPLE7LEAKED",
+    "userName": "dev-bot"
+  },
+  "eventTime": "2026-06-28T03:14:07Z",
+  "eventSource": "s3.amazonaws.com",
+  "eventName": "ListBuckets",
+  "awsRegion": "us-east-1",
+  "sourceIPAddress": "45.155.205.233",
+  "userAgent": "aws-cli/2.15.0 Python/3.11 Linux/6.5",
+  "requestParameters": null,
+  "responseElements": null,
+  "eventID": "b1a2c3d4-0001-4f00-9abc-EXAMPLE00001",
+  "eventType": "AwsApiCall",
+  "recipientAccountId": "123456789012",
+  "_aegis_note": "Scenario #1 sample: dev-bot's access key used from an unfamiliar IP (RU-geo). Phase 1 detection compares this source IP/region to the identity baseline."
+}

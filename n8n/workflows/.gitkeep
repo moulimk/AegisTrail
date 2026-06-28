@@ -1,0 +1,3 @@
+# Exported n8n workflow JSON goes here.
+# IMPORTANT: scrub credentials before committing. Keep raw editor exports as
+# *.local.json (gitignored); commit sanitized *.json only.

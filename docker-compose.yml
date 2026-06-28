@@ -1,0 +1,52 @@
+# AegisTrail — local dev stack (Phase 0)
+# n8n (SOAR orchestration) + Postgres (detector state) + detector (FastAPI).
+# Bring up:  docker compose up -d --build
+# Tear down: docker compose down         (add -v to also wipe data volumes)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegis-postgres
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_dev_pw}
+      POSTGRES_DB: aegistrail
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegistrail"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  detector:
+    build: ./detector
+    container_name: aegis-detector
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://aegis:${POSTGRES_PASSWORD:-change_me_dev_pw}@postgres:5432/aegistrail
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: aegis-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=true
+      - GENERIC_TIMEZONE=UTC
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  pgdata:
+  n8n_data:

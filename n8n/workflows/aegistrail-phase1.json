@@ -1,0 +1,92 @@
+{
+  "name": "AegisTrail - Phase 1 (Scenario #1: leaked key)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aegistrail",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "8f3a1c20-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "8f3a1c20-0000-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://detector:8000/ingest",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "8f3a1c20-0000-4000-8000-000000000002",
+      "name": "Detector Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://ip-api.com/json/{{ $json.normalized.source_ip }}?fields=status,message,country,countryCode,city,isp,query",
+        "options": {}
+      },
+      "id": "8f3a1c20-0000-4000-8000-000000000003",
+      "name": "GeoIP Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ev = $('Detector Ingest').first().json.normalized;\nconst geo = $('GeoIP Lookup').first().json;\nconst located = geo && geo.status === 'success';\nconst loc = located ? `${geo.city || '?'}, ${geo.country || '?'} (${geo.isp || 'unknown ISP'})` : 'location unknown';\nconst text = `:shield: *AegisTrail Alert - suspicious identity activity*\\n*Identity:* ${ev.identity}\\n*Action:* ${ev.action} (${ev.service || 'n/a'})\\n*Source IP:* ${ev.source_ip} - ${loc}\\n*AWS region:* ${ev.region || 'n/a'}\\n*Event ID:* ${ev.event_id}\\n_Scenario #1: access key used from an unfamiliar location. Phase 1 enrichment only; risk scoring arrives in Phase 2._`;\nreturn [{ json: { slack_text: text, identity: ev.identity, source_ip: ev.source_ip, country: geo.country || null, event_id: ev.event_id } }];"
+      },
+      "id": "8f3a1c20-0000-4000-8000-000000000004",
+      "name": "Build Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE_WITH_YOUR_INCOMING_WEBHOOK_URL",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.slack_text }) }}",
+        "options": {}
+      },
+      "id": "8f3a1c20-0000-4000-8000-000000000005",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Detector Ingest", "type": "main", "index": 0 }]]
+    },
+    "Detector Ingest": {
+      "main": [[{ "node": "GeoIP Lookup", "type": "main", "index": 0 }]]
+    },
+    "GeoIP Lookup": {
+      "main": [[{ "node": "Build Alert", "type": "main", "index": 0 }]]
+    },
+    "Build Alert": {
+      "main": [[{ "node": "Slack Alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "meta": {}
+}

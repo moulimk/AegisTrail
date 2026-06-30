@@ -21,6 +21,11 @@ class ScoreRequest(BaseModel):
     event_id: str
 
 
+class ResolveRequest(BaseModel):
+    incident_id: str
+    status: Literal["CONTAINED", "CLOSED", "FALSE_POSITIVE"]
+
+
 class SeedRequest(BaseModel):
     identity: str
     known_regions: list[str] = []

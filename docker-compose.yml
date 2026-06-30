@@ -44,6 +44,9 @@ services:
       - N8N_RUNNERS_ENABLED=true
       - GENERIC_TIMEZONE=UTC
       - WEBHOOK_URL=http://localhost:5678/
+      # allow {{ $env.SLACK_WEBHOOK_URL }} in workflows (kept out of the committed JSON)
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     volumes:
       - n8n_data:/home/node/.n8n
 

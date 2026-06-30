@@ -14,7 +14,7 @@ from . import baseline as baseline_mod
 from . import detect, geoip, scoring, triage
 from .contain import contain
 from .db import get_conn
-from .models import ContainRequest, ContainResult, ScoreRequest, SeedRequest
+from .models import ContainRequest, ContainResult, ResolveRequest, ScoreRequest, SeedRequest
 from .normalize import normalize_cloudtrail
 
 app = FastAPI(title="AegisTrail Detector", version="0.3.0")
@@ -84,7 +84,7 @@ def score_event(req: ScoreRequest):
     """Enrich a stored event, run rules, score it, AI-triage it, raise an incident."""
     with get_conn() as conn:
         ev = conn.execute(
-            "SELECT event_id, identity, action, service, source_ip, region FROM events WHERE event_id = %s",
+            "SELECT event_id, identity, action, service, source_ip, region, raw_event FROM events WHERE event_id = %s",
             (req.event_id,),
         ).fetchone()
         if ev is None:
@@ -137,6 +137,13 @@ def score_event(req: ScoreRequest):
         )
         conn.commit()
 
+    # Containment hint: what the responder would act on (used by the approval gate).
+    user_identity = (ev["raw_event"] or {}).get("userIdentity", {})
+    type_map = {"Root": "root", "IAMUser": "iam_user", "AssumedRole": "role_session"}
+    identity_type = type_map.get(user_identity.get("type"), "iam_user")
+    access_key_id = user_identity.get("accessKeyId")
+    suggested_action = "deactivate_key" if access_key_id else "disable_user"
+
     return {
         "event_id": ev["event_id"],
         "identity": ev["identity"],
@@ -150,7 +157,27 @@ def score_event(req: ScoreRequest):
         "summary": summary,
         "recommended_action": recommended_action,
         "incident_id": incident_id,
+        "containment": {
+            "identity": ev["identity"],
+            "identity_type": identity_type,
+            "access_key_id": access_key_id,
+            "suggested_action": suggested_action,
+        },
     }
+
+
+@app.post("/incident/resolve")
+def resolve_incident(req: ResolveRequest):
+    """Close the loop on an incident (CONTAINED / CLOSED / FALSE_POSITIVE) for the audit trail."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "UPDATE incidents SET status = %s, updated_at = now() WHERE incident_id = %s RETURNING incident_id",
+            (req.status, req.incident_id),
+        ).fetchone()
+        conn.commit()
+    if row is None:
+        raise HTTPException(status_code=404, detail="incident not found")
+    return {"incident_id": req.incident_id, "status": req.status}
 
 
 @app.post("/contain", response_model=ContainResult)

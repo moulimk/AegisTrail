@@ -1,0 +1,195 @@
+{
+  "name": "AegisTrail - Phase 3 (human-in-the-loop containment)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "aegistrail", "responseMode": "onReceived", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 380],
+      "webhookId": "9b000000-0000-4000-8000-0000000000aa"
+    },
+    {
+      "parameters": { "method": "POST", "url": "http://detector:8000/ingest", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json.body) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000002",
+      "name": "Detector Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 380]
+    },
+    {
+      "parameters": { "method": "POST", "url": "http://detector:8000/score", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ event_id: $json.normalized.event_id }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000003",
+      "name": "Detector Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [580, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+          "conditions": [ { "id": "risk-threshold", "leftValue": "={{ $json.risk_score }}", "rightValue": 50, "operator": { "type": "number", "operation": "gte" } } ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b000000-0000-4000-8000-000000000004",
+      "name": "Risk Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [760, 380]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $('Detector Score').first().json; const resume = $execution.resumeUrl; const sig = (r.signals||[]).map(s => `- *${s.type}*: ${s.detail}`).join('\\n'); const geo = r.geo ? `${r.geo.city||'?'}, ${r.geo.country||'?'}` : 'unknown'; const c = r.containment || {}; const text = `:rotating_light: *AegisTrail: ${r.incident_type}* (risk *${r.risk_score}/100*)\\n*Identity:* ${r.identity}   *Location:* ${geo}\\n*Signals:*\\n${sig}\\n*AI triage:* ${r.summary||'(rules-only)'}\\n*Proposed action:* ${c.suggested_action} on ${c.identity} (${c.access_key_id||'n/a'})\\n*Decision:* <${resume}?decision=approve|APPROVE & contain>   |   <${resume}?decision=dismiss|DISMISS>`; return [{ json: { slack_text: text } }];"
+      },
+      "id": "9b000000-0000-4000-8000-000000000005",
+      "name": "Build Approval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 240]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.SLACK_WEBHOOK_URL }}", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ text: $json.slack_text }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000006",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 240]
+    },
+    {
+      "parameters": { "resume": "webhook", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000007",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1320, 240],
+      "webhookId": "9b000000-0000-4000-8000-0000000000bb"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const j = $json || {}; const q = j.query || {}; const decision = q.decision || j.decision || (j.body && j.body.decision) || 'dismiss'; return [{ json: { decision } }];"
+      },
+      "id": "9b000000-0000-4000-8000-000000000008",
+      "name": "Read Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "typeValidation": "loose", "version": 2 },
+          "conditions": [ { "id": "is-approve", "leftValue": "={{ $json.decision }}", "rightValue": "approve", "operator": { "type": "string", "operation": "equals" } } ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b000000-0000-4000-8000-000000000009",
+      "name": "Approve Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1680, 240]
+    },
+    {
+      "parameters": { "method": "POST", "url": "http://detector:8000/contain", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ identity: $('Detector Score').first().json.containment.identity, identity_type: $('Detector Score').first().json.containment.identity_type, action: $('Detector Score').first().json.containment.suggested_action, access_key_id: $('Detector Score').first().json.containment.access_key_id, reason: 'approved via Slack' }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000010",
+      "name": "Detector Contain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 160]
+    },
+    {
+      "parameters": { "method": "POST", "url": "http://detector:8000/incident/resolve", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ incident_id: $('Detector Score').first().json.incident_id, status: 'CONTAINED' }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000011",
+      "name": "Resolve Contained",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2060, 160]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const cont = $('Detector Contain').first().json; const plan = (cont.plan || []).join('\\n'); const safe = cont.safe_mode; const inc = $('Detector Score').first().json.incident_id; const text = `:white_check_mark: *Containment ${safe ? 'PLAN (SAFE_MODE - not executed)' : 'EXECUTED'}* for incident ${inc}\\n*Action plan:*\\n${plan}\\nIncident marked *CONTAINED*.`; return [{ json: { slack_text: text } }];"
+      },
+      "id": "9b000000-0000-4000-8000-000000000012",
+      "name": "Build Contain Msg",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 160]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.SLACK_WEBHOOK_URL }}", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ text: $json.slack_text }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000013",
+      "name": "Slack Contained",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 160]
+    },
+    {
+      "parameters": { "method": "POST", "url": "http://detector:8000/incident/resolve", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ incident_id: $('Detector Score').first().json.incident_id, status: 'FALSE_POSITIVE' }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000014",
+      "name": "Resolve Dismissed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 360]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const inc = $('Detector Score').first().json.incident_id; const text = `:no_entry_sign: *Incident dismissed* (${inc}) - marked FALSE_POSITIVE by analyst.`; return [{ json: { slack_text: text } }];"
+      },
+      "id": "9b000000-0000-4000-8000-000000000015",
+      "name": "Build Dismiss Msg",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2060, 360]
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.SLACK_WEBHOOK_URL }}", "sendBody": true, "contentType": "json", "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ text: $json.slack_text }) }}", "options": {} },
+      "id": "9b000000-0000-4000-8000-000000000016",
+      "name": "Slack Dismissed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2240, 360]
+    },
+    {
+      "parameters": {},
+      "id": "9b000000-0000-4000-8000-000000000017",
+      "name": "Auto-Close (low risk)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 480]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Detector Ingest", "type": "main", "index": 0 }]] },
+    "Detector Ingest": { "main": [[{ "node": "Detector Score", "type": "main", "index": 0 }]] },
+    "Detector Score": { "main": [[{ "node": "Risk Gate", "type": "main", "index": 0 }]] },
+    "Risk Gate": { "main": [
+      [{ "node": "Build Approval", "type": "main", "index": 0 }],
+      [{ "node": "Auto-Close (low risk)", "type": "main", "index": 0 }]
+    ] },
+    "Build Approval": { "main": [[{ "node": "Slack Alert", "type": "main", "index": 0 }]] },
+    "Slack Alert": { "main": [[{ "node": "Wait for Approval", "type": "main", "index": 0 }]] },
+    "Wait for Approval": { "main": [[{ "node": "Read Decision", "type": "main", "index": 0 }]] },
+    "Read Decision": { "main": [[{ "node": "Approve Gate", "type": "main", "index": 0 }]] },
+    "Approve Gate": { "main": [
+      [{ "node": "Detector Contain", "type": "main", "index": 0 }],
+      [{ "node": "Resolve Dismissed", "type": "main", "index": 0 }]
+    ] },
+    "Detector Contain": { "main": [[{ "node": "Resolve Contained", "type": "main", "index": 0 }]] },
+    "Resolve Contained": { "main": [[{ "node": "Build Contain Msg", "type": "main", "index": 0 }]] },
+    "Build Contain Msg": { "main": [[{ "node": "Slack Contained", "type": "main", "index": 0 }]] },
+    "Resolve Dismissed": { "main": [[{ "node": "Build Dismiss Msg", "type": "main", "index": 0 }]] },
+    "Build Dismiss Msg": { "main": [[{ "node": "Slack Dismissed", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "meta": {}
+}

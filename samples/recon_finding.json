@@ -1,0 +1,21 @@
+{
+  "eventVersion": "1.08",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLE0DEVBOT",
+    "arn": "arn:aws:iam::123456789012:user/dev-bot",
+    "accountId": "123456789012",
+    "accessKeyId": "AKIAEXAMPLE7LEAKED",
+    "userName": "dev-bot"
+  },
+  "eventTime": "2026-06-28T03:16:10Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "GetAccountAuthorizationDetails",
+  "awsRegion": "us-east-1",
+  "sourceIPAddress": "45.155.205.233",
+  "userAgent": "Boto3/1.26.0 Python/3.11",
+  "eventID": "b1a2c3d4-0003-4f00-9abc-EXAMPLE00003",
+  "eventType": "AwsApiCall",
+  "recipientAccountId": "123456789012",
+  "_aegis_note": "Scenario #3: dev-bot dumps the full IAM config (classic recon) from the RU IP -> RECON + NEW_REGION + TI_HOSTING."
+}

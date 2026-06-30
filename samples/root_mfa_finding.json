@@ -1,0 +1,23 @@
+{
+  "eventVersion": "1.08",
+  "userIdentity": {
+    "type": "Root",
+    "principalId": "123456789012",
+    "arn": "arn:aws:iam::123456789012:root",
+    "accountId": "123456789012"
+  },
+  "eventTime": "2026-06-28T03:17:30Z",
+  "eventSource": "iam.amazonaws.com",
+  "eventName": "DeactivateMFADevice",
+  "awsRegion": "us-east-1",
+  "sourceIPAddress": "45.155.205.233",
+  "userAgent": "console.amazonaws.com",
+  "requestParameters": {
+    "userName": "root",
+    "serialNumber": "arn:aws:iam::123456789012:mfa/root"
+  },
+  "eventID": "b1a2c3d4-0004-4f00-9abc-EXAMPLE00004",
+  "eventType": "AwsApiCall",
+  "recipientAccountId": "123456789012",
+  "_aegis_note": "Scenario #4: root disables its own MFA from the RU IP -> ROOT_ACTIVITY + MFA_DISABLED. Containment is BLOCKED (protected identity) -> escalate to human."
+}

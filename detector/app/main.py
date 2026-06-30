@@ -94,9 +94,19 @@ def score_event(req: ScoreRequest):
         geo = geoip.lookup(ev["source_ip"])
         ti = abuseipdb.lookup(ev["source_ip"])
 
+        # Behavioral context: count this identity's recent read/list calls (recon burst).
+        recon_count = conn.execute(
+            """
+            SELECT count(*) AS c FROM events
+            WHERE identity = %s AND event_time > now() - interval '10 minutes'
+              AND (action LIKE 'List%%' OR action LIKE 'Describe%%' OR action LIKE 'Get%%')
+            """,
+            (ev["identity"],),
+        ).fetchone()["c"]
+
         # Deterministic detection + scoring
         base = baseline_mod.get_baseline(conn, ev["identity"])
-        signals = detect.run_rules(ev, geo, ti, base)
+        signals = detect.run_rules(ev, geo, ti, base, recon_count=recon_count)
         risk = scoring.score([s["type"] for s in signals])
         itype = detect.incident_type(signals) if signals else None
         conf = detect.confidence(signals) if signals else 0.0

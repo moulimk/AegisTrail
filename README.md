@@ -60,11 +60,12 @@ flowchart LR
 |---|----------|---------|-------------|
 | 1 | **Leaked key, new geo/IP** ✅ | `NEW_REGION`, `TI_HOSTING` | deactivate access key (on approval) |
 | 2 | **IAM privilege escalation** ✅ | `PRIV_ESC_CHAIN` (+ `NEW_REGION`) → `CREDENTIAL_COMPROMISE` | detach policy / deactivate key |
-| 3 | Recon / enumeration 🚧 | burst of `List*`/`Describe*` | alert-only by default |
-| 4 | Root usage / MFA disabled 🚧 | root principal / `DeactivateMFADevice` | escalate to human (no auto-disable) |
+| 3 | **Recon / enumeration** ✅ | `RECON` (+ correlated) | alert-only (low base score) |
+| 4 | **Root usage / MFA disabled** ✅ | `ROOT_ACTIVITY`, `MFA_DISABLED` | escalate to human — containment **blocked** for root |
 
-Scenarios #1 and #2 are fully implemented (detect → triage → contain). #3 and #4 are scoped as
-detect-and-alert only — consistent with the "don't auto-contain everything" design.
+All four scenarios have detections. #1 and #2 run the full detect → triage → contain loop; #3 and #4 are
+detect-and-alert (root containment is intentionally blocked by the protected-identity allowlist — the tool
+escalates to a human rather than auto-disabling root).
 
 **Hybrid detection:** custom CloudTrail/EventBridge rules *and* GuardDuty findings feed the same pipeline.
 
@@ -74,9 +75,12 @@ Deterministic rules produce signals; each signal has a base score; the LLM then 
 
 | Signal | Base | Meaning |
 |--------|------|---------|
-| `NEW_REGION` | 20 | source-IP country outside the identity's baseline |
 | `TI_HOSTING` | 15 | source IP is datacenter/hosting (suspicious for a human identity) |
+| `NEW_REGION` | 20 | source-IP country outside the identity's baseline |
+| `RECON` | 25 | IAM enumeration action or a burst of read/list calls |
 | `TI_ABUSE` | 40 | source IP flagged by AbuseIPDB |
+| `MFA_DISABLED` | 45 | MFA device deactivated/deleted |
+| `ROOT_ACTIVITY` | 50 | any use of the root account |
 | `PRIV_ESC_CHAIN` | 60 | sensitive IAM mutation (`AttachUserPolicy`, `CreateAccessKey`, …) |
 
 Correlated signals raise the incident type (e.g. `NEW_REGION` + `PRIV_ESC_CHAIN` → `CREDENTIAL_COMPROMISE`).
@@ -153,8 +157,7 @@ Built on AWS, **designed cloud-portable** — see [docs/azure-entra-mapping.md](
 ## Roadmap
 
 - Rollback / undo for a containment (false-positive recovery)
-- Scenarios #3 (recon) and #4 (root/MFA) as detections
-- Detection-as-code tests (`stratus-red-team` as a test suite)
+- Live-attack detection tests with `stratus-red-team`
 - Terraform for the AWS lab + a metrics dashboard (MTTR before/after)
 
 ## License

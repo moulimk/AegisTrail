@@ -48,7 +48,7 @@ def contain(req: ContainRequest) -> ContainResult:
             allowed=False,
             executed=False,
             plan=[],
-            notes="BLOCKED: protected identity — escalate to a human; do not auto-contain.",
+            notes="BLOCKED: protected identity - escalate to a human; do not auto-contain.",
         )
 
     plan = _plan_for(req)

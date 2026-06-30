@@ -43,6 +43,15 @@ def available() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY"))
 
 
+def _coerce_action(action) -> str:
+    """Validate the model's recommended action against the allowlist.
+
+    This is the prompt-injection / unsafe-output defense: anything the model
+    returns that isn't an exact enum member is neutralized to escalate_to_human.
+    """
+    return action if action in RECOMMENDED_ACTIONS else "escalate_to_human"
+
+
 def triage(context: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Return {summary, recommended_action, severity_opinion} or None if disabled."""
     if not available():
@@ -69,9 +78,7 @@ def triage(context: dict[str, Any]) -> Optional[dict[str, Any]]:
         return {"summary": None, "recommended_action": "escalate_to_human",
                 "severity_opinion": None, "error": str(exc)}
 
-    action = out.get("recommended_action")
-    if action not in RECOMMENDED_ACTIONS:
-        action = "escalate_to_human"
+    action = _coerce_action(out.get("recommended_action"))
     return {
         "summary": out.get("summary"),
         "recommended_action": action,

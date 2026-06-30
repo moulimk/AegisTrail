@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: Detector tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r detector/requirements.txt -r detector/requirements-dev.txt
+      - name: Run tests
+        working-directory: detector
+        run: python -m pytest -q
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for leaked credentials
+        run: |
+          if git grep -nE 'sk-proj-[A-Za-z0-9_-]{20}|hooks\.slack\.com/services/T[0-9A-Z]{5}|ABUSEIPDB_API_KEY=[0-9a-f]{30}' -- . ':!*.md'; then
+            echo "::error::Potential secret committed"; exit 1
+          fi
+          echo "No secrets found."

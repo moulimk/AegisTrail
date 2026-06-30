@@ -31,8 +31,7 @@ so the same pipeline can be re-pointed at a different cloud.
 - The enrichment IAM lookups (boto3 → Microsoft Graph / Azure SDK)
 - The containment calls (`iam:UpdateAccessKey` → Entra disable-user / revoke-sessions)
 
-## Interview note
 
-The point of this doc is to show the system was designed cloud-portable: deep on
+**The point of this doc is to show the system was designed cloud-portable: deep on
 one cloud, fluent across the others. The detection logic and response automation
-port directly; re-pointing AegisTrail at Azure is a connector swap, not a rewrite.
+port directly; re-pointing AegisTrail at Azure is a connector swap, not a rewrite.**

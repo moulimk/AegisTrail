@@ -7,6 +7,7 @@
   POST /contain        — SAFE_MODE action plan (protected-identity guarded)
 """
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from psycopg.types.json import Json
 
 from . import abuseipdb
@@ -16,6 +17,7 @@ from .contain import contain
 from .db import get_conn
 from .models import ContainRequest, ContainResult, ResolveRequest, ScoreRequest, SeedRequest
 from .normalize import normalize_cloudtrail
+from .dashboard import DASHBOARD_HTML
 
 app = FastAPI(title="AegisTrail Detector", version="0.3.0")
 
@@ -188,6 +190,39 @@ def resolve_incident(req: ResolveRequest):
     if row is None:
         raise HTTPException(status_code=404, detail="incident not found")
     return {"incident_id": req.incident_id, "status": req.status}
+
+
+@app.get("/incidents")
+def list_incidents(limit: int = 50):
+    """Recent incidents for the dashboard (newest first)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT incident_id, identity, incident_type, risk_score, confidence,
+                   status, summary, signals, created_at
+            FROM incidents ORDER BY created_at DESC LIMIT %s
+            """,
+            (limit,),
+        ).fetchall()
+    return {"incidents": [
+        {
+            "incident_id": str(r["incident_id"]),
+            "identity": r["identity"],
+            "incident_type": r["incident_type"],
+            "risk_score": r["risk_score"],
+            "confidence": r["confidence"],
+            "status": r["status"],
+            "summary": r["summary"],
+            "signals": r["signals"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard():
+    return DASHBOARD_HTML
 
 
 @app.post("/contain", response_model=ContainResult)

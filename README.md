@@ -100,6 +100,7 @@ docker compose up -d --build
 |---------|-----|---------|
 | n8n | http://localhost:5678 | SOAR orchestration (import a workflow from `n8n/workflows/`) |
 | detector | http://localhost:8000/docs | FastAPI — `/ingest`, `/score`, `/contain`, `/incident/resolve` |
+| **incident console** | http://localhost:8000/dashboard | live dashboard: risk, signals, AI summary, status |
 | postgres | localhost:5432 | detector state + audit trail |
 
 > ⚠️ Use `docker compose down` to stop. **Never `down -v`** — that wipes the n8n volume (account + workflows).
@@ -123,6 +124,8 @@ curl -X POST http://localhost:8000/baseline/seed -H 'Content-Type: application/j
 You'll get a Slack alert (risk **95/100**, `CREDENTIAL_COMPROMISE`, AI summary, `escalate_to_human`) with
 **Approve / Dismiss** links. Clicking **Approve** runs the SAFE_MODE containment plan and marks the incident
 `CONTAINED`. Re-seed between runs — the detector *learns* each geo it sees.
+
+Open **http://localhost:8000/dashboard** to watch incidents appear live (risk, signals, AI summary, status).
 
 ## Security model (the tool is threat-modeled as a target)
 

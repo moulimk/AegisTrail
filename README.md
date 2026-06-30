@@ -1,5 +1,10 @@
 # 🛡️ AegisTrail
 
+![CI](https://github.com/moulimk/AegisTrail/actions/workflows/ci.yml/badge.svg)
+![license](https://img.shields.io/badge/license-MIT-blue.svg)
+![python](https://img.shields.io/badge/python-3.12-blue.svg)
+![n8n](https://img.shields.io/badge/SOAR-n8n-EA4B71.svg)
+
 **An AI-assisted SOAR pipeline for AWS identity threats — detect → enrich → triage → human-approve → contain.**
 
 AegisTrail is an open-source, event-driven security-automation platform. It ingests AWS
